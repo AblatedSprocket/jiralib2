@@ -62,6 +62,11 @@
   :group 'jiralib2
   :type 'string)
 
+(defcustom jiralib2-user-account-id nil
+  "Account ID to use for JIRA API calls."
+  :group 'jiralib2
+  :type 'string)
+
 (defcustom jiralib2-auth 'cookie
   "Authentication mode for JIRA."
   :group 'jiralib2
@@ -144,15 +149,20 @@
   "Fetch information on currently logged in user."
   (jiralib2-session-call "/rest/api/2/myself"))
 
+(defun jiralib2-get-user-account-id ()
+  "Fetch Account ID of currently logged in user."
+  (cdr (assoc 'accountId (jiralib2-session-call "/rest/api/2/myself"))))
+
 (defun jiralib2-verify-setup ()
   "Verify that server and login are configured correctly."
   (interactive)
   (let ((info (jiralib2-get-user-info)))
     (message
-     "Successfully logged in\n\nUsername:  %s\nFull Name: %s\nEmail:     %s"
+     "Successfully logged in\n\nUsername:  %s\nFull Name: %s\nEmail:     %s\nAccount ID: %s\n"
      (alist-get 'name info)
      (alist-get 'displayName info)
-     (alist-get 'emailAddress info))))
+     (alist-get 'emailAddress info)
+     (alist-get 'accountId info))))
 
 (defun jiralib2--session-call (path args)
   "Do a call to PATH with ARGS using current session.
@@ -238,9 +248,9 @@ If no session exists, or it has expired, login first."
 (defvar jiralib2--users-cache nil)
 (defun jiralib2-get-users (project-key)
   "Return assignable users information given the PROJECT-KEY."
-
   (or jiralib2--users-cache
-      (jiralib2--get-users project-key)))
+      (setq jiralib2--users-cache
+            (jiralib2--get-users project-key))))
 
 (defun jiralib2-get-assignable-users (issue-key)
   "Get the assignable users for ISSUE-KEY."
@@ -262,11 +272,11 @@ If no session exists, or it has expired, login first."
     users))
 
 
-(defun jiralib2-assign-issue (issue-key username)
-  "Assign issue with ISSUE-KEY to USERNAME."
+(defun jiralib2-assign-issue (issue-key account-id)
+  "Assign issue with ISSUE-KEY to ACCOUNT-ID."
   (jiralib2-session-call (format "/rest/api/2/issue/%s/assignee" issue-key)
                          :type "PUT"
-                         :data (json-encode `((name . ,username)))))
+                         :data (json-encode `((accountId . ,account-id)))))
 
 (defun jiralib2-do-jql-search (jql &optional limit)
   "Run a JQL query and return the list of issues that matched.
